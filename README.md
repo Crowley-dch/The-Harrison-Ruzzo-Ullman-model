@@ -16,12 +16,8 @@ A complete implementation of the Harrison-Ruzzo-Ullman (HRU) access  model .
 
 
 ### Running the Project
-1. **Start the server:**
+1. **Start the model:**
    ```bash
-   python server.py
+   python model.py
    ```
 
-2. **Start the client (in another terminal):**
-   ```bash
-   python client.py
-   ```

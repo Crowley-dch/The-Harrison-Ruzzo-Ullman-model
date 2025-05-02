@@ -1,9 +1,4 @@
-import sys
 import sqlite3
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QLineEdit, QPushButton, QTabWidget, QTableWidget,
-                             QTableWidgetItem, QMessageBox, QComboBox, QGroupBox)
-
 
 class HRUDatabase:
     def __init__(self):
@@ -277,354 +272,426 @@ class HRUDatabase:
         else:
             return None
 
+    def display_rights(self, subject_name=None, object_name=None):
+        rights = self.get_rights(subject_name, object_name)
+        if rights is None:
+            print("Нет данных для отображения")
+            return
 
-class HRUGUI(QMainWindow):
+        if subject_name and object_name:
+            print(f"\nПрава субъекта {subject_name} на объект {object_name}:")
+            print(f"Чтение: {'Да' if rights['read'] else 'Нет'}")
+            print(f"Запись: {'Да' if rights['write'] else 'Нет'}")
+            print(f"Владение: {'Да' if rights['own'] else 'Нет'}")
+        elif subject_name:
+            print(f"\nВсе права субъекта {subject_name}:")
+            print("{:<20} {:<10} {:<10} {:<10}".format("Объект", "Чтение", "Запись", "Владение"))
+            for right in rights:
+                print("{:<20} {:<10} {:<10} {:<10}".format(
+                    right['object'],
+                    'Да' if right['read'] else 'Нет',
+                    'Да' if right['write'] else 'Нет',
+                    'Да' if right['own'] else 'Нет'
+                ))
+        elif object_name:
+            print(f"\nВсе права на объект {object_name}:")
+            print("{:<20} {:<10} {:<10} {:<10}".format("Субъект", "Чтение", "Запись", "Владение"))
+            for right in rights:
+                print("{:<20} {:<10} {:<10} {:<10}".format(
+                    right['subject'],
+                    'Да' if right['read'] else 'Нет',
+                    'Да' if right['write'] else 'Нет',
+                    'Да' if right['own'] else 'Нет'
+                ))
+
+class HRUConsole:
     def __init__(self):
-        super().__init__()
         self.db = HRUDatabase()
-        self.init_ui()
-        self.update_lists()
-
-    def init_ui(self):
-        self.setWindowTitle('Модель HRU (Харрисона-Руззо-Ульмана)')
-        self.setGeometry(100, 100, 800, 600)
-
-        main_widget = QWidget()
-        self.setCentralWidget(main_widget)
-        main_layout = QVBoxLayout()
-        main_widget.setLayout(main_layout)
-
-        self.tabs = QTabWidget()
-        main_layout.addWidget(self.tabs)
-
-        self.create_subject_tab()
-        self.create_object_tab()
-        self.create_rights_tab()
-        self.create_view_tab()
-
-        self.update_lists()
-
-    def create_subject_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
-        tab.setLayout(layout)
-        self.tabs.addTab(tab, "Управление субъектами")
-
-        group_create = QGroupBox("Создать субъект")
-        layout_create = QVBoxLayout()
-        group_create.setLayout(layout_create)
-
-        self.subject_name_input = QLineEdit()
-        self.subject_name_input.setPlaceholderText("Имя субъекта")
-        layout_create.addWidget(self.subject_name_input)
-
-        btn_create = QPushButton("Создать")
-        btn_create.clicked.connect(self.create_subject)
-        layout_create.addWidget(btn_create)
-
-        layout.addWidget(group_create)
-
-        group_delete = QGroupBox("Удалить субъект")
-        layout_delete = QVBoxLayout()
-        group_delete.setLayout(layout_delete)
-
-        self.subject_delete_combo = QComboBox()
-        layout_delete.addWidget(self.subject_delete_combo)
-
-        btn_delete = QPushButton("Удалить")
-        btn_delete.clicked.connect(self.delete_subject)
-        layout_delete.addWidget(btn_delete)
-
-        layout.addWidget(group_delete)
-
-    def create_object_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
-        tab.setLayout(layout)
-        self.tabs.addTab(tab, "Управление объектами")
-
-        group_create = QGroupBox("Создать объект")
-        layout_create = QVBoxLayout()
-        group_create.setLayout(layout_create)
-
-        self.object_name_input = QLineEdit()
-        self.object_name_input.setPlaceholderText("Имя объекта")
-        layout_create.addWidget(self.object_name_input)
-
-        self.object_owner_combo = QComboBox()
-        layout_create.addWidget(QLabel("Владелец:"))
-        layout_create.addWidget(self.object_owner_combo)
-
-        btn_create = QPushButton("Создать")
-        btn_create.clicked.connect(self.create_object)
-        layout_create.addWidget(btn_create)
-
-        layout.addWidget(group_create)
-
-        group_delete = QGroupBox("Удалить объект")
-        layout_delete = QVBoxLayout()
-        group_delete.setLayout(layout_delete)
-
-        self.object_delete_combo = QComboBox()
-        layout_delete.addWidget(self.object_delete_combo)
-
-        self.object_deleter_combo = QComboBox()
-        layout_delete.addWidget(QLabel("Субъект, удаляющий объект:"))
-        layout_delete.addWidget(self.object_deleter_combo)
-
-        btn_delete = QPushButton("Удалить")
-        btn_delete.clicked.connect(self.delete_object)
-        layout_delete.addWidget(btn_delete)
-
-        layout.addWidget(group_delete)
-
-    def create_rights_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
-        tab.setLayout(layout)
-        self.tabs.addTab(tab, "Управление правами")
-
-        group_grant = QGroupBox("Передать право")
-        layout_grant = QVBoxLayout()
-        group_grant.setLayout(layout_grant)
-
-        self.grantor_combo = QComboBox()
-        layout_grant.addWidget(QLabel("Кто передает (владелец):"))
-        layout_grant.addWidget(self.grantor_combo)
-
-        self.recipient_combo = QComboBox()
-        layout_grant.addWidget(QLabel("Кому передается:"))
-        layout_grant.addWidget(self.recipient_combo)
-
-        self.object_grant_combo = QComboBox()
-        layout_grant.addWidget(QLabel("Объект:"))
-        layout_grant.addWidget(self.object_grant_combo)
-
-        self.right_combo = QComboBox()
-        self.right_combo.addItems(['read', 'write', 'own'])
-        layout_grant.addWidget(QLabel("Право:"))
-        layout_grant.addWidget(self.right_combo)
-
-        btn_grant = QPushButton("Передать право")
-        btn_grant.clicked.connect(self.grant_right)
-        layout_grant.addWidget(btn_grant)
-
-        layout.addWidget(group_grant)
-
-        group_revoke = QGroupBox("Отозвать право")
-        layout_revoke = QVBoxLayout()
-        group_revoke.setLayout(layout_revoke)
-
-        self.revoker_combo = QComboBox()
-        layout_revoke.addWidget(QLabel("Кто отзывает (владелец):"))
-        layout_revoke.addWidget(self.revoker_combo)
-
-        self.target_combo = QComboBox()
-        layout_revoke.addWidget(QLabel("У кого отзывается:"))
-        layout_revoke.addWidget(self.target_combo)
-
-        self.object_revoke_combo = QComboBox()
-        layout_revoke.addWidget(QLabel("Объект:"))
-        layout_revoke.addWidget(self.object_revoke_combo)
-
-        self.right_revoke_combo = QComboBox()
-        self.right_revoke_combo.addItems(['read', 'write', 'own'])
-        layout_revoke.addWidget(QLabel("Право:"))
-        layout_revoke.addWidget(self.right_revoke_combo)
-
-        btn_revoke = QPushButton("Отозвать право")
-        btn_revoke.clicked.connect(self.revoke_right)
-        layout_revoke.addWidget(btn_revoke)
-
-        layout.addWidget(group_revoke)
-
-    def create_view_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
-        tab.setLayout(layout)
-        self.tabs.addTab(tab, "Просмотр прав")
-
-        self.view_mode = QComboBox()
-        self.view_mode.addItems(["Права субъекта", "Права на объект"])
-        self.view_mode.currentIndexChanged.connect(self.update_view)
-        layout.addWidget(self.view_mode)
-
-        self.view_selector = QComboBox()
-        layout.addWidget(self.view_selector)
-
-        self.rights_table = QTableWidget()
-        self.rights_table.setColumnCount(4)
-        self.rights_table.setHorizontalHeaderLabels(["Имя", "Чтение", "Запись", "Владение"])
-        self.rights_table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.rights_table)
-
-        btn_refresh = QPushButton("Обновить")
-        btn_refresh.clicked.connect(self.update_view)
-        layout.addWidget(btn_refresh)
-
-    def update_lists(self):
-        subjects = self.db.get_subjects()
-
-        self.subject_delete_combo.clear()
-        self.subject_delete_combo.addItems(subjects)
-
-        self.object_owner_combo.clear()
-        self.object_owner_combo.addItems(subjects)
-
-        self.grantor_combo.clear()
-        self.grantor_combo.addItems(subjects)
-
-        self.recipient_combo.clear()
-        self.recipient_combo.addItems(subjects)
-
-        self.revoker_combo.clear()
-        self.revoker_combo.addItems(subjects)
-
-        self.target_combo.clear()
-        self.target_combo.addItems(subjects)
-
-        self.object_deleter_combo.clear()
-        self.object_deleter_combo.addItems(subjects)
-
-        objects = self.db.get_objects()
-
-        self.object_delete_combo.clear()
-        self.object_delete_combo.addItems(objects)
-
-        self.object_grant_combo.clear()
-        self.object_grant_combo.addItems(objects)
-
-        self.object_revoke_combo.clear()
-        self.object_revoke_combo.addItems(objects)
-
-        self.update_view_selector()
-
-    def update_view_selector(self):
-        self.view_selector.clear()
-        if self.view_mode.currentIndex() == 0:  # Права субъекта
-            self.view_selector.addItems(self.db.get_subjects())
-        else:  
-            self.view_selector.addItems(self.db.get_objects())
-
-    def update_view(self):
-        self.update_view_selector()
-
-        if self.view_mode.currentIndex() == 0:  # Права субъекта
-            subject = self.view_selector.currentText()
-            rights = self.db.get_rights(subject_name=subject)
-
-            self.rights_table.setRowCount(len(rights))
-            for i, right in enumerate(rights):
-                self.rights_table.setItem(i, 0, QTableWidgetItem(right['object']))
-                self.rights_table.setItem(i, 1, QTableWidgetItem("✓" if right['read'] else "✗"))
-                self.rights_table.setItem(i, 2, QTableWidgetItem("✓" if right['write'] else "✗"))
-                self.rights_table.setItem(i, 3, QTableWidgetItem("✓" if right['own'] else "✗"))
-        else:
-            object_name = self.view_selector.currentText()
-            rights = self.db.get_rights(object_name=object_name)
-
-            self.rights_table.setRowCount(len(rights))
-            for i, right in enumerate(rights):
-                self.rights_table.setItem(i, 0, QTableWidgetItem(right['subject']))
-                self.rights_table.setItem(i, 1, QTableWidgetItem("✓" if right['read'] else "✗"))
-                self.rights_table.setItem(i, 2, QTableWidgetItem("✓" if right['write'] else "✗"))
-                self.rights_table.setItem(i, 3, QTableWidgetItem("✓" if right['own'] else "✗"))
-
-    def create_subject(self):
-        name = self.subject_name_input.text().strip()
-        if not name:
-            QMessageBox.warning(self, "Ошибка", "Введите имя субъекта")
-            return
-
-        success, message = self.db.create_subject(name)
-        if success:
-            self.subject_name_input.clear()
-            self.update_lists()
-        QMessageBox.information(self, "Результат", message)
-
-    def delete_subject(self):
-        name = self.subject_delete_combo.currentText()
-        if not name:
-            return
-
-        reply = QMessageBox.question(
-            self, 'Подтверждение',
-            f"Вы уверены, что хотите удалить субъект {name}?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-
-        if reply == QMessageBox.Yes:
-            success, message = self.db.delete_subject(name)
-            if success:
-                self.update_lists()
-            QMessageBox.information(self, "Результат", message)
-
-    def create_object(self):
-        name = self.object_name_input.text().strip()
-        if not name:
-            QMessageBox.warning(self, "Ошибка", "Введите имя объекта")
-            return
-
-        owner = self.object_owner_combo.currentText()
-        if not owner:
-            QMessageBox.warning(self, "Ошибка", "Выберите владельца")
-            return
-
-        success, message = self.db.create_object(name, owner)
-        if success:
-            self.object_name_input.clear()
-            self.update_lists()
-        QMessageBox.information(self, "Результат", message)
-
-    def delete_object(self):
-        object_name = self.object_delete_combo.currentText()
-        subject_name = self.object_deleter_combo.currentText()
-        if not object_name or not subject_name:
-            return
-
-        reply = QMessageBox.question(
-            self, 'Подтверждение',
-            f"Вы уверены, что хотите удалить объект {object_name}?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-
-        if reply == QMessageBox.Yes:
-            success, message = self.db.delete_object(object_name, subject_name)
-            if success:
-                self.update_lists()
-            QMessageBox.information(self, "Результат", message)
+        self.run()
+
+    def display_menu(self):
+        print("\nМеню HRU модели:")
+        print("1. Управление субъектами")
+        print("2. Управление объектами")
+        print("3. Управление правами")
+        print("4. Просмотр прав")
+        print("5. Выход")
+
+    def run(self):
+        while True:
+            self.display_menu()
+            choice = input("Выберите пункт меню: ")
+
+            if choice == '1':
+                self.manage_subjects()
+            elif choice == '2':
+                self.manage_objects()
+            elif choice == '3':
+                self.manage_rights()
+            elif choice == '4':
+                self.view_rights()
+            elif choice == '5':
+                print("Выход из программы")
+                break
+            else:
+                print("Неверный выбор. Попробуйте снова.")
+
+    def manage_subjects(self):
+        while True:
+            print("\nУправление субъектами:")
+            print("1. Создать субъект")
+            print("2. Удалить субъект")
+            print("3. Список всех субъектов")
+            print("4. Назад")
+
+            choice = input("Выберите действие: ")
+
+            if choice == '1':
+                name = input("Введите имя нового субъекта: ").strip()
+                if name:
+                    success, message = self.db.create_subject(name)
+                    print(message)
+                else:
+                    print("Имя субъекта не может быть пустым")
+            elif choice == '2':
+                subjects = self.db.get_subjects()
+                if not subjects:
+                    print("Нет субъектов для удаления")
+                    continue
+
+                print("Доступные субъекты:")
+                for i, subject in enumerate(subjects, 1):
+                    print(f"{i}. {subject}")
+
+                try:
+                    num = int(input("Выберите номер субъекта для удаления: "))
+                    if 1 <= num <= len(subjects):
+                        success, message = self.db.delete_subject(subjects[num-1])
+                        print(message)
+                    else:
+                        print("Неверный номер")
+                except ValueError:
+                    print("Введите число")
+            elif choice == '3':
+                subjects = self.db.get_subjects()
+                if subjects:
+                    print("\nСписок субъектов:")
+                    for subject in subjects:
+                        print(subject)
+                else:
+                    print("Нет субъектов")
+            elif choice == '4':
+                break
+            else:
+                print("Неверный выбор")
+
+    def manage_objects(self):
+        while True:
+            print("\nУправление объектами:")
+            print("1. Создать объект")
+            print("2. Удалить объект")
+            print("3. Список всех объектов")
+            print("4. Назад")
+
+            choice = input("Выберите действие: ")
+
+            if choice == '1':
+                name = input("Введите имя нового объекта: ").strip()
+                if not name:
+                    print("Имя объекта не может быть пустым")
+                    continue
+
+                subjects = self.db.get_subjects()
+                if not subjects:
+                    print("Нет субъектов. Сначала создайте хотя бы одного субъекта.")
+                    continue
+
+                print("Доступные владельцы:")
+                for i, subject in enumerate(subjects, 1):
+                    print(f"{i}. {subject}")
+
+                try:
+                    num = int(input("Выберите номер владельца: "))
+                    if 1 <= num <= len(subjects):
+                        success, message = self.db.create_object(name, subjects[num-1])
+                        print(message)
+                    else:
+                        print("Неверный номер")
+                except ValueError:
+                    print("Введите число")
+            elif choice == '2':
+                objects = self.db.get_objects()
+                if not objects:
+                    print("Нет объектов для удаления")
+                    continue
+
+                print("Доступные объекты:")
+                for i, obj in enumerate(objects, 1):
+                    print(f"{i}. {obj}")
+
+                try:
+                    num = int(input("Выберите номер объекта для удаления: "))
+                    if not (1 <= num <= len(objects)):
+                        print("Неверный номер")
+                        continue
+
+                    object_name = objects[num-1]
+                    subjects = self.db.get_subjects()
+                    print("Доступные субъекты для удаления:")
+                    for i, subject in enumerate(subjects, 1):
+                        print(f"{i}. {subject}")
+
+                    num_subj = int(input("Выберите номер субъекта, который удаляет объект: "))
+                    if 1 <= num_subj <= len(subjects):
+                        success, message = self.db.delete_object(object_name, subjects[num_subj-1])
+                        print(message)
+                    else:
+                        print("Неверный номер")
+                except ValueError:
+                    print("Введите число")
+            elif choice == '3':
+                objects = self.db.get_objects()
+                if objects:
+                    print("\nСписок объектов:")
+                    for obj in objects:
+                        print(obj)
+                else:
+                    print("Нет объектов")
+            elif choice == '4':
+                break
+            else:
+                print("Неверный выбор")
+
+    def manage_rights(self):
+        while True:
+            print("\nУправление правами:")
+            print("1. Передать право")
+            print("2. Отозвать право")
+            print("3. Назад")
+
+            choice = input("Выберите действие: ")
+
+            if choice == '1':
+                self.grant_right()
+            elif choice == '2':
+                self.revoke_right()
+            elif choice == '3':
+                break
+            else:
+                print("Неверный выбор")
 
     def grant_right(self):
-        grantor = self.grantor_combo.currentText()
-        recipient = self.recipient_combo.currentText()
-        object_name = self.object_grant_combo.currentText()
-        right = self.right_combo.currentText()
-
-        if not all([grantor, recipient, object_name]):
-            QMessageBox.warning(self, "Ошибка", "Заполните все поля")
+        subjects = self.db.get_subjects()
+        if len(subjects) < 2:
+            print("Нужно как минимум 2 субъекта для передачи прав")
             return
 
-        success, message = self.db.grant_right(grantor, recipient, object_name, right)
-        if success:
-            self.update_view()
-        QMessageBox.information(self, "Результат", message)
+        objects = self.db.get_objects()
+        if not objects:
+            print("Нет объектов для управления правами")
+            return
+
+        print("Выберите владельца, который передает право:")
+        for i, subject in enumerate(subjects, 1):
+            print(f"{i}. {subject}")
+
+        try:
+            num_grantor = int(input("Номер владельца: "))
+            if not (1 <= num_grantor <= len(subjects)):
+                print("Неверный номер")
+                return
+
+            print("Выберите получателя права:")
+            for i, subject in enumerate(subjects, 1):
+                if i != num_grantor:
+                    print(f"{i}. {subject}")
+
+            num_recipient = int(input("Номер получателя: "))
+            if not (1 <= num_recipient <= len(subjects)) or num_recipient == num_grantor:
+                print("Неверный номер")
+                return
+
+            print("Выберите объект:")
+            for i, obj in enumerate(objects, 1):
+                print(f"{i}. {obj}")
+
+            num_object = int(input("Номер объекта: "))
+            if not (1 <= num_object <= len(objects)):
+                print("Неверный номер")
+                return
+
+            print("Выберите право:")
+            print("1. Чтение (read)")
+            print("2. Запись (write)")
+            print("3. Владение (own)")
+
+            num_right = int(input("Номер права: "))
+            if num_right == 1:
+                right = 'read'
+            elif num_right == 2:
+                right = 'write'
+            elif num_right == 3:
+                right = 'own'
+            else:
+                print("Неверный номер")
+                return
+
+            grantor = subjects[num_grantor-1]
+            recipient = subjects[num_recipient-1]
+            object_name = objects[num_object-1]
+
+            success, message = self.db.grant_right(grantor, recipient, object_name, right)
+            print(message)
+        except ValueError:
+            print("Введите число")
 
     def revoke_right(self):
-        revoker = self.revoker_combo.currentText()
-        target = self.target_combo.currentText()
-        object_name = self.object_revoke_combo.currentText()
-        right = self.right_revoke_combo.currentText()
-
-        if not all([revoker, target, object_name]):
-            QMessageBox.warning(self, "Ошибка", "Заполните все поля")
+        subjects = self.db.get_subjects()
+        if len(subjects) < 2:
+            print("Нужно как минимум 2 субъекта для отзыва прав")
             return
 
-        success, message = self.db.revoke_right(revoker, target, object_name, right)
-        if success:
-            self.update_view()
-        QMessageBox.information(self, "Результат", message)
+        objects = self.db.get_objects()
+        if not objects:
+            print("Нет объектов для управления правами")
+            return
 
+        print("Выберите владельца, который отзывает право:")
+        for i, subject in enumerate(subjects, 1):
+            print(f"{i}. {subject}")
+
+        try:
+            num_revoker = int(input("Номер владельца: "))
+            if not (1 <= num_revoker <= len(subjects)):
+                print("Неверный номер")
+                return
+
+            print("Выберите субъекта, у которого отзывается право:")
+            for i, subject in enumerate(subjects, 1):
+                if i != num_revoker:
+                    print(f"{i}. {subject}")
+
+            num_target = int(input("Номер субъекта: "))
+            if not (1 <= num_target <= len(subjects)) or num_target == num_revoker:
+                print("Неверный номер")
+                return
+
+            print("Выберите объект:")
+            for i, obj in enumerate(objects, 1):
+                print(f"{i}. {obj}")
+
+            num_object = int(input("Номер объекта: "))
+            if not (1 <= num_object <= len(objects)):
+                print("Неверный номер")
+                return
+
+            print("Выберите право для отзыва:")
+            print("1. Чтение (read)")
+            print("2. Запись (write)")
+            print("3. Владение (own)")
+
+            num_right = int(input("Номер права: "))
+            if num_right == 1:
+                right = 'read'
+            elif num_right == 2:
+                right = 'write'
+            elif num_right == 3:
+                right = 'own'
+            else:
+                print("Неверный номер")
+                return
+
+            revoker = subjects[num_revoker-1]
+            target = subjects[num_target-1]
+            object_name = objects[num_object-1]
+
+            success, message = self.db.revoke_right(revoker, target, object_name, right)
+            print(message)
+        except ValueError:
+            print("Введите число")
+
+    def view_rights(self):
+        while True:
+            print("\nПросмотр прав:")
+            print("1. Права конкретного субъекта")
+            print("2. Права на конкретный объект")
+            print("3. Права субъекта на объект")
+            print("4. Назад")
+
+            choice = input("Выберите действие: ")
+
+            if choice == '1':
+                subjects = self.db.get_subjects()
+                if not subjects:
+                    print("Нет субъектов")
+                    continue
+
+                print("Выберите субъект:")
+                for i, subject in enumerate(subjects, 1):
+                    print(f"{i}. {subject}")
+
+                try:
+                    num = int(input("Номер субъекта: "))
+                    if 1 <= num <= len(subjects):
+                        self.db.display_rights(subject_name=subjects[num-1])
+                    else:
+                        print("Неверный номер")
+                except ValueError:
+                    print("Введите число")
+            elif choice == '2':
+                objects = self.db.get_objects()
+                if not objects:
+                    print("Нет объектов")
+                    continue
+
+                print("Выберите объект:")
+                for i, obj in enumerate(objects, 1):
+                    print(f"{i}. {obj}")
+
+                try:
+                    num = int(input("Номер объекта: "))
+                    if 1 <= num <= len(objects):
+                        self.db.display_rights(object_name=objects[num-1])
+                    else:
+                        print("Неверный номер")
+                except ValueError:
+                    print("Введите число")
+            elif choice == '3':
+                subjects = self.db.get_subjects()
+                if not subjects:
+                    print("Нет субъектов")
+                    continue
+
+                objects = self.db.get_objects()
+                if not objects:
+                    print("Нет объектов")
+                    continue
+
+                print("Выберите субъект:")
+                for i, subject in enumerate(subjects, 1):
+                    print(f"{i}. {subject}")
+
+                num_subj = int(input("Номер субъекта: "))
+                if not (1 <= num_subj <= len(subjects)):
+                    print("Неверный номер")
+                    continue
+
+                print("Выберите объект:")
+                for i, obj in enumerate(objects, 1):
+                    print(f"{i}. {obj}")
+
+                num_obj = int(input("Номер объекта: "))
+                if 1 <= num_obj <= len(objects):
+                    self.db.display_rights(
+                        subject_name=subjects[num_subj-1],
+                        object_name=objects[num_obj-1]
+                    )
+                else:
+                    print("Неверный номер")
+            elif choice == '4':
+                break
+            else:
+                print("Неверный выбор")
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    window = HRUGUI()
-    window.show()
-    sys.exit(app.exec_())
+    HRUConsole()
